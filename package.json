@@ -114,7 +114,8 @@
       "buildUniversalInstaller": false,
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "include": "build/installer.nsh"
     },
     "portable": {
       "artifactName": "${productName}-${version}-Windows-${arch}-Portable.${ext}",
