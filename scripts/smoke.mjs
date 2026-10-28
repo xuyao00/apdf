@@ -30,6 +30,7 @@ async function launch() {
 try {
   let launched = await launch(); app = launched.instance; let page = launched.page;
   await expect(page.getByRole('heading', { name: 'Your library', exact: true })).toBeVisible();
+  const appVersion = await app.evaluate(({ app }) => app.getVersion());
   // Exercise the actual preload/IPC action without blocking on native dialogs.
   await app.evaluate(({ dialog, shell }) => {
     globalThis.apdfUpdateTest = { fetch: globalThis.fetch, dialog: dialog.showMessageBox, external: shell.openExternal, messages: [], opened: [], reply: 0 };
@@ -38,7 +39,7 @@ try {
   });
   try {
     for (const [status, body, message] of [
-      [200, { tag_name: 'v0.1.0' }, 'aPDF is up to date'],
+      [200, { tag_name: `v${appVersion}` }, 'aPDF is up to date'],
       [404, {}, 'No release is available yet'],
       [200, { tag_name: 'v99.0.0' }, 'aPDF 99.0.0 is available'],
       [429, {}, 'Could not update aPDF']
@@ -60,6 +61,16 @@ try {
   await expect.poll(() => app.evaluate(({ nativeTheme }) => nativeTheme.shouldUseDarkColors)).toBe(true);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.screenshot({ path: join(results, 'library-dark-titlebar.png'), animations: 'disabled' });
+  // Rapid reference traversal can batch an older exit and a newer entry for
+  // one page in the same observer callback. The newest entry must win.
+  await page.evaluate(() => {
+    const NativeObserver = window.IntersectionObserver;
+    window.IntersectionObserver = class extends NativeObserver {
+      constructor(callback, options) {
+        super((entries, observer) => callback(entries.flatMap(entry => entry.isIntersecting && entry.target.classList.contains('pdf-page') ? [new Proxy(entry, { get(target, key) { return key === 'isIntersecting' ? false : Reflect.get(target, key, target); } }), entry] : [entry]), observer), options);
+      }
+    };
+  });
   await app.evaluate(({ app }, file) => app.emit('open-file', { preventDefault() {} }, file), fixture);
   await expect(page.getByText('All pages ready')).toBeVisible({ timeout: 30000 });
   await expect(page.locator('.document-name strong')).toHaveText('A quieter way to read research');

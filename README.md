@@ -81,7 +81,7 @@ To create the macOS installer on a Mac, including a universal app for Apple Sili
 npm run dist:mac
 ```
 
-Open `release/aPDF-0.1.0-macOS-universal.dmg`, then drag **aPDF** into **Applications**. The same directory also contains a ZIP of the universal app. These local builds have no Developer ID signature or Apple notarization; distribution to other users requires signing/notarization credentials.
+Open `release/aPDF-0.2.0-macOS-universal.dmg`, then drag **aPDF** into **Applications**. The same directory also contains a ZIP of the universal app. These local builds have no Developer ID signature or Apple notarization; distribution to other users requires signing/notarization credentials.
 
 The icon source, PNG, and ICNS are in `build/`. `npm run icons:mac` regenerates the native icon sizes using macOS tools. See [icon design and generation prompt](build/icon-design.md).
 
@@ -101,7 +101,7 @@ npm run dist:desktop  # both platforms from a supported build host
 
 Windows installers support installation for the current user and let you choose the installation folder. The portable EXEs run without installation. The installers are unsigned.
 
-On Debian or Ubuntu, install the package for your architecture with `sudo apt install ./aPDF-0.1.0-Linux-amd64.deb` (or the `arm64` package). This installs the application, icon, desktop entry, and PDF file association. Removing the package preserves your personal library. The Debian packager uses the existing project author label; it adds no maintainer email or project website. The portable Linux archives contain the `apdf` executable and its resources.
+On Debian or Ubuntu, install the package for your architecture with `sudo apt install ./aPDF-0.2.0-Linux-amd64.deb` (or the `arm64` package). This installs the application, icon, desktop entry, and PDF file association. Removing the package preserves your personal library. The Debian packager uses the existing project author label; it adds no maintainer email or project website. The portable Linux archives contain the `apdf` executable and its resources.
 
 Outputs in `release/`:
 
@@ -111,7 +111,7 @@ Outputs in `release/`:
 | Windows | NSIS installer, portable executable |
 | macOS | DMG, ZIP |
 
-`npm run dist:dir` creates an unpacked app for testing. The GitHub Actions workflow builds on all three operating systems, runs unit and native integration tests, and uploads unpacked apps. Its manual **Build installers** option produces installer artifacts too. The workflow has been supplied but has not been run here. Windows/Linux binaries still need validation on their target systems. Production distribution also needs appropriate macOS signing/notarization and Windows signing credentials; no credentials are included. Local development packages are unsigned.
+`npm run dist:dir` creates an unpacked app for testing. The GitHub Actions workflow builds on all three operating systems, runs unit and native integration tests, and uploads unpacked apps. Its manual **Build installers** option produces installer artifacts too. Native smoke tests run on all three operating systems in GitHub Actions. Installation and upgrade flows still need validation on physical target systems. Production distribution also needs appropriate macOS signing/notarization and Windows signing credentials; no credentials are included. Local development packages are unsigned.
 
 ## Verification
 

@@ -22,7 +22,7 @@ export function PdfPage(props: Props) {
   const size = measuredSize || defaultSize;
   useEffect(() => {
     if (eager) return;
-    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: '900px' });
+    const observer = new IntersectionObserver(entries => setVisible(entries[entries.length - 1].isIntersecting), { rootMargin: '900px' });
     observer.observe(wrapper.current!);
     return () => observer.disconnect();
   }, [eager]);
