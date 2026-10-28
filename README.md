@@ -137,7 +137,21 @@ Current limits: 300 MB per PDF; no OCR for image-only scans, annotation editing,
 
 ## Updates
 
-Choose **Check for updates** in the library sidebar, the reader’s **More reader actions** menu, or the native **Help** menu. aPDF checks the latest stable GitHub release and opens its download page when a newer version is available. Checks run only when requested; updates are installed manually. No published release, connection errors, and GitHub rate limits are reported explicitly.
+Choose **Check for updates** in the library sidebar, the reader’s **More reader actions** menu, or the native **Help** menu. Checks run only when requested.
+
+For installed Windows (NSIS) and Linux (Debian) builds, confirm **Download update**, follow its progress, then choose **Restart and install**. Choosing **Later** keeps the downloaded update ready for this session; closing the app does not install it automatically. Linux may request administrator authorization. Saved PDFs, citations, and reading positions stay in the user profile. Finish unsaved citation edits before restarting.
+
+macOS in-app installation requires a properly signed app. Unsigned macOS builds, development builds, Windows portable executables, Linux tar archives, and releases without update metadata open the GitHub release page for manual installation. Existing users must manually install the first updater-enabled version once.
+
+### Publishing updates
+
+Increase `package.json` and `package-lock.json` versions together, build the installers with the commands above, and upload the installers **and their generated update metadata** to the matching GitHub release. Include:
+
+- Windows: `latest-x64.yml`, `latest-arm64.yml`, both `Setup.exe` installers and their `.blockmap` files.
+- macOS: `latest-mac.yml`, universal ZIP and DMG, and generated `.blockmap` files. Sign with a consistent Developer ID identity and notarize distribution builds before enabling macOS installation.
+- Linux: `latest-linux.yml`, `latest-linux-arm64.yml`, and matching `.deb` files. The custom Debian packager writes these manifests with SHA-512 checksums and adds the updater configuration and package identity to Debian installations only.
+
+The Windows channel names keep x64 and ARM64 downloads separate. Release tags should match the package version (for example, `v0.2.0`); publish stable releases without the prerelease flag. Desktop CI artifacts include the generated metadata when installers are requested. Never embed a GitHub publishing token in the application.
 
 ## License
 

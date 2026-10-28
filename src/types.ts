@@ -5,9 +5,12 @@ export interface LibraryEntry {
   addedAt: string; lastOpenedAt: string; size: number; page: number; pageCount?: number;
 }
 export interface OpenedFile { token: string; filename: string; bytes: Uint8Array; entry?: LibraryEntry }
+export interface UpdateState { phase: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'installing'; version?: string; percent?: number }
 export interface DesktopAPI {
   platform: string;
   checkForUpdates(): Promise<void>;
+  getUpdateState(): Promise<UpdateState>;
+  onUpdateState(callback: (state: UpdateState) => void): () => void;
   setTheme(theme: 'light' | 'dark'): Promise<void>;
   open(): Promise<OpenedFile | null>;
   openDropped(file: File): Promise<OpenedFile>;

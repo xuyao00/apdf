@@ -3,7 +3,8 @@
 // produce the Debian archive using the project's existing metadata.
 import { readFile, writeFile, mkdir, mkdtemp, cp, chmod, symlink, stat, lstat, readdir, open, rm } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
-import { resolve, join, basename } from 'node:path';
+import { createHash } from 'node:crypto';
+import { resolve, join, basename, dirname } from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -29,6 +30,16 @@ export async function writeDebArchive(output, members) {
       if (size % 2) await writeAll(Buffer.from('\n'));
     }
   } finally { await file.close(); }
+}
+export async function writeDebUpdateInfo(output, arch, metadata) {
+  const hash = createHash('sha512');
+  for await (const chunk of createReadStream(output)) hash.update(chunk);
+  const filename = basename(output), sha512 = hash.digest('base64');
+  const info = { version: metadata.version, files: [{ url: filename, sha512, size: (await stat(output)).size }], path: filename, sha512, releaseDate: new Date().toISOString() };
+  const manifest = join(dirname(output), `latest-linux${arch === 'x64' ? '' : '-' + arch}.yml`);
+  // JSON is also valid YAML; no new packaging dependency is needed.
+  await writeFile(manifest, JSON.stringify(info, null, 2) + '\n');
+  return manifest;
 }
 async function bytesIn(directory) {
   let size = 0;
@@ -63,6 +74,8 @@ export async function packageDeb(arch, metadata, tar) {
     const root = join(temporary, 'data'), control = join(temporary, 'control');
     const app = join(root, 'opt', product);
     await cp(unpacked, app, { recursive: true, verbatimSymlinks: true });
+    await writeFile(join(app, 'resources/package-type'), 'deb\n');
+    await writeFile(join(app, 'resources/app-update.yml'), JSON.stringify({ ...metadata.build.publish, updaterCacheDirName: `${name}-updater` }, null, 2) + '\n');
     const { normalizeLinuxPermissions } = createRequire(import.meta.url)('./after-pack.cjs');
     await normalizeLinuxPermissions(root);
     await chmod(join(app, 'chrome-sandbox'), 0o4755);
@@ -90,6 +103,7 @@ export async function packageDeb(arch, metadata, tar) {
     const version = join(temporary, 'debian-binary'); await writeFile(version, '2.0\n');
     const output = resolve('release', `${product}-${metadata.version}-Linux-${debArch}.deb`);
     await writeDebArchive(output, [version, controlTar, dataTar]);
+    await writeDebUpdateInfo(output, arch, metadata);
     console.log(`Built ${output}`);
     return output;
   } finally { await rm(temporary, { recursive: true, force: true }); }

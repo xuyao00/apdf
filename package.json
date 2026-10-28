@@ -21,7 +21,8 @@
     "dist:linux": "npm run build && electron-builder --linux tar.gz --x64 --arm64 --publish never && node scripts/package-deb.mjs",
     "dist:desktop": "npm run build && electron-builder --win nsis portable --linux tar.gz --x64 --arm64 --publish never && node scripts/package-deb.mjs",
     "dist": "npm run build && electron-builder",
-    "dist:dir": "npm run build && electron-builder --dir"
+    "dist:dir": "npm run build && electron-builder --dir",
+    "test:updates": "node scripts/updater-smoke.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
@@ -99,7 +100,14 @@
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "publish": {
+        "provider": "github",
+        "owner": "xuyao00",
+        "repo": "apdf",
+        "releaseType": "release",
+        "channel": "latest-${arch}"
+      }
     },
     "nsis": {
       "artifactName": "${productName}-${version}-Windows-${arch}-Setup.${ext}",
@@ -129,6 +137,16 @@
         "mimeType": "application/pdf",
         "role": "Viewer"
       }
-    ]
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "xuyao00",
+      "repo": "apdf",
+      "releaseType": "release"
+    },
+    "electronUpdaterCompatibility": ">=2.16"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.12"
   }
 }

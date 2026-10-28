@@ -4,8 +4,9 @@ import { mkdtemp, mkdir, writeFile, readFile, stat, symlink, chmod, rm } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { writeDebArchive } from '../scripts/package-deb.mjs';
+import { writeDebArchive, writeDebUpdateInfo } from '../scripts/package-deb.mjs';
 const { normalizeLinuxPermissions } = createRequire(import.meta.url)('../scripts/after-pack.cjs');
 
 test('Linux permissions preserve execution without world writes or following symlinks', { skip: process.platform === 'win32' }, async t => {
@@ -38,5 +39,21 @@ test('Debian ar container is readable by the system ar tool, including odd-sized
     const extracted = spawnSync('ar', ['-p', output, members[i]]);
     assert.equal(extracted.status, 0, extracted.stderr.toString());
     assert.deepEqual(extracted.stdout, contents[i]);
+  }
+});
+
+
+test('Debian update feeds select one architecture and hash the exact installer bytes', async t => {
+  const temporary = await mkdtemp(join(tmpdir(), 'apdf-update-feed-'));
+  t.after(() => rm(temporary, { recursive: true, force: true }));
+  for (const [arch, suffix] of [['x64', ''], ['arm64', '-arm64']]) {
+    const output = join(temporary, `aPDF-Linux-${arch}.deb`), bytes = Buffer.from(`Debian installer ${arch}`);
+    await writeFile(output, bytes);
+    const manifest = await writeDebUpdateInfo(output, arch, { version: '0.2.0' });
+    assert.equal(manifest, join(temporary, `latest-linux${suffix}.yml`));
+    const info = JSON.parse(await readFile(manifest, 'utf8'));
+    assert.equal(info.version, '0.2.0');
+    assert.equal(info.files.length, 1);
+    assert.deepEqual(info.files[0], { url: `aPDF-Linux-${arch}.deb`, sha512: createHash('sha512').update(bytes).digest('base64'), size: bytes.length });
   }
 });

@@ -30,10 +30,14 @@ jobs:
       - run: npm run build
       - name: Native integration test (Linux)
         if: runner.os == 'Linux'
-        run: xvfb-run -a npm run test:e2e
+        run: |
+          xvfb-run -a npm run test:e2e
+          xvfb-run -a npm run test:updates
       - name: Native integration test (Windows / macOS)
         if: runner.os != 'Linux'
-        run: npm run test:e2e
+        run: |
+          npm run test:e2e
+          npm run test:updates
       - name: Package unpacked app
         run: npm run dist:dir -- --publish never
       - name: Build installers

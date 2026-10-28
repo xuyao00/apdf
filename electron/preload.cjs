@@ -2,6 +2,12 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 contextBridge.exposeInMainWorld('apdf', {
   platform: process.platform,
   checkForUpdates: () => ipcRenderer.invoke('app:check-updates'),
+  getUpdateState: () => ipcRenderer.invoke('app:update-state'),
+  onUpdateState: callback => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('app:update-state', listener);
+    return () => ipcRenderer.removeListener('app:update-state', listener);
+  },
   setTheme: theme => ipcRenderer.invoke('app:theme', theme),
   open: () => ipcRenderer.invoke('pdf:open'),
   openDropped: file => ipcRenderer.invoke('pdf:drop', webUtils.getPathForFile(file)),

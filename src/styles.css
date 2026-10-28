@@ -251,3 +251,8 @@ mark { background: #dfca6b66; color: inherit; padding: 1px 0; }
 
 .toolbar-more.update-menu { display: block; }
 .update-check { margin: 0 10px 12px; }
+
+.update-status { position: fixed; z-index: 65; bottom: 22px; right: 22px; max-width: calc(100vw - 44px); width: 300px; padding: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow); font-size: 12px; }
+.update-status p { margin: 0 0 10px; }
+.update-status progress { width: 100%; accent-color: var(--accent); }
+.update-status button { margin-top: 4px; font-size: 11px; }

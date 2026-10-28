@@ -5,6 +5,9 @@ const { pathToFileURL } = require('node:url');
 const { randomUUID } = require('node:crypto');
 const { Library, validatePdf, MAX_PDF_BYTES } = require('./library.cjs');
 const { getUpdateStatus } = require('./updates.cjs');
+const { UpdateController } = require('./update-controller.cjs');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'apdf', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 let window, library, pendingFile;
@@ -51,29 +54,38 @@ async function external(url) {
   if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('Only HTTP and HTTPS links can be opened.');
   await shell.openExternal(parsed.href);
 }
-let updateCheck;
-function checkForUpdates() {
-  if (updateCheck) return updateCheck;
-  updateCheck = (async () => {
-    const owner = window;
-    const show = options => owner && !owner.isDestroyed() ? dialog.showMessageBox(owner, options) : dialog.showMessageBox(options);
+const updateMetadataName = process.platform === 'win32' ? `latest-${process.arch}.yml` : process.platform === 'darwin' ? 'latest-mac.yml' : `latest-linux${process.arch === 'x64' ? '' : '-' + process.arch}.yml`;
+async function unsupportedUpdateReason() {
+  if (!app.isPackaged) return 'Development builds are updated manually.';
+  if (process.env.PORTABLE_EXECUTABLE_FILE) return 'Portable builds are updated manually.';
+  if (process.platform === 'darwin') {
     try {
-      const result = await getUpdateStatus(app.getVersion());
-      const available = result.status === 'available';
-      const { response } = await show({
-        type: 'info', title: 'aPDF updates',
-        message: available ? `aPDF ${result.latestVersion} is available` : result.status === 'no-release' ? 'No release is available yet' : 'aPDF is up to date',
-        detail: `Installed version: ${result.currentVersion}.` + (available ? '\nDownload the installer for your operating system from GitHub Releases.' : result.status === 'no-release' ? '\nCheck again after a release has been published on GitHub.' : '\nYou have the latest available version or a newer development build.'),
-        buttons: available ? ['View release', 'Later'] : ['OK'], defaultId: 0, cancelId: available ? 1 : 0,
-        noLink: true
-      });
-      if (available && response === 0) await external(result.releaseUrl);
-    } catch (error) {
-      await show({ type: 'error', title: 'aPDF updates', message: 'Could not check for updates', detail: error.message, buttons: ['OK'] });
-    }
-  })().finally(() => { updateCheck = undefined; });
-  return updateCheck;
+      const { stderr } = await promisify(execFile)('/usr/bin/codesign', ['-dv', '--verbose=4', app.getPath('exe').replace(/\/Contents\/MacOS\/[^/]+$/, '')], { timeout: 5000 });
+      if (!/^TeamIdentifier=(?!not set)[A-Z0-9]+$/m.test(stderr)) return 'This macOS build is unsigned. Install the new version manually.';
+    } catch { return 'This macOS build is unsigned. Install the new version manually.'; }
+  } else if (process.platform === 'linux') {
+    const type = await fs.readFile(path.join(process.resourcesPath, 'package-type'), 'utf8').catch(() => '');
+    if (type.trim() !== 'deb') return 'This Linux archive is updated manually. Debian installations support in-app updates.';
+  } else if (process.platform !== 'win32') return 'Install the new version manually on this platform.';
+  return '';
 }
+const updates = new UpdateController({
+  getRelease: () => getUpdateStatus(app.getVersion()),
+  getUpdater: () => require('electron-updater').autoUpdater,
+  unsupportedReason: unsupportedUpdateReason,
+  metadataName: updateMetadataName,
+  show: options => {
+    const settings = { title: 'aPDF updates', defaultId: 0, cancelId: 0, noLink: true, ...options };
+    return window && !window.isDestroyed() ? dialog.showMessageBox(window, settings) : dialog.showMessageBox(settings);
+  },
+  openExternal: external,
+  publish: state => {
+    window?.webContents.send('app:update-state', state);
+    window?.setProgressBar(state.phase === 'downloading' ? state.percent / 100 : -1);
+  },
+  beforeInstall: async () => { await library.queue; await themeWrites; }
+});
+const checkForUpdates = () => updates.check();
 function createWindow() {
   window = new BrowserWindow({
     width: 1320, height: 900, minWidth: 800, minHeight: 600,
@@ -157,6 +169,7 @@ if (gotLock) app.whenReady().then(async () => {
   });
   handle('app:external', external);
   handle('app:check-updates', checkForUpdates);
+  handle('app:update-state', () => updates.state);
   handle('app:theme', requested => {
     if (requested !== 'light' && requested !== 'dark') throw new Error('Invalid theme.');
     theme = requested;

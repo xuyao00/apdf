@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDownAZ, ArrowRight, RefreshCw, BookOpen, Check, Clock3, FilePlus2, FileText, FolderOpen, HardDrive, Library, LoaderCircle, LockKeyhole, Moon, MoreHorizontal, Plus, Search, ShieldCheck, Sparkles, Sun, Trash2, Upload, X } from 'lucide-react';
 import { Reader } from './components/Reader';
 import { BibtexDialog } from './components/BibtexDialog';
+import { UpdateStatus } from './components/UpdateStatus';
 import { loadPdf } from './pdf';
 import type { DocumentState, LibraryEntry, OpenedFile } from './types';
 import appIcon from '../build/icon.png';
@@ -143,6 +144,7 @@ export default function App() {
           <footer className="library-footer"><span><ShieldCheck size={14} /> Your library stays on your device.</span><span>Made for curious minds.</span></footer>
         </main>
       </div></>}
+    <UpdateStatus onError={notify} />
     {notice && <div className={`toast ${notice.error ? 'error-toast' : ''}`} role={notice.error ? 'alert' : 'status'}>{notice.error ? <span>!</span> : <Check size={17} />}<p>{notice.message}</p><button className="icon-button" aria-label="Dismiss notification" onClick={() => setNotice(null)}><X size={15} /></button></div>}
     {loading && <div className="loading-overlay"><LoaderCircle className="spinner" size={25} /><span>Opening document…</span></div>}
     {dragging && <div className="drop-overlay"><Upload size={35} /><h2>Drop into a quieter reading space.</h2><p>Open a PDF from your device</p></div>}

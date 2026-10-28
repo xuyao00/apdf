@@ -45,6 +45,7 @@ async function getUpdateStatus(currentVersion, fetchRelease = globalThis.fetch) 
   return {
     status: comparison > 0 ? 'available' : 'current', currentVersion,
     latestVersion: release.tag_name.replace(/^v/, ''),
+    updateFiles: Array.isArray(release.assets) ? release.assets.filter(asset => asset && asset.state === 'uploaded').map(asset => asset.name) : [],
     // Construct a trusted GitHub URL instead of opening a URL from the response.
     releaseUrl: `https://github.com/xuyao00/apdf/releases/tag/${encodeURIComponent(release.tag_name)}`
   };

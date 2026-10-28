@@ -41,7 +41,7 @@ try {
       [200, { tag_name: 'v0.1.0' }, 'aPDF is up to date'],
       [404, {}, 'No release is available yet'],
       [200, { tag_name: 'v99.0.0' }, 'aPDF 99.0.0 is available'],
-      [429, {}, 'Could not check for updates']
+      [429, {}, 'Could not update aPDF']
     ]) {
       await app.evaluate((_electron, { status, body }) => { globalThis.fetch = async () => new Response(JSON.stringify(body), { status }); }, { status, body });
       await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
