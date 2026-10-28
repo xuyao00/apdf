@@ -100,18 +100,65 @@ try {
   await page.getByRole('textbox', { name: 'Search query' }).fill('(a+)+$');
   await expect(page.locator('.search-status')).toContainText('took too long', { timeout: 10000 });
   await page.getByRole('textbox', { name: 'Search query' }).fill('Table\\s+1');
-  await expect(page.locator('.search-status')).toHaveText('2 results');
+  await expect(page.locator('.search-status')).toHaveText('3 results');
   await page.getByRole('button', { name: 'Close navigation' }).click();
   await page.getByRole('textbox', { name: 'Page number', exact: true }).fill('1');
   await page.getByRole('textbox', { name: 'Page number', exact: true }).press('Enter');
+  const documentScroll = page.locator('.document-scroll');
+  const preview = page.getByRole('dialog', { name: 'Reference preview' });
+  const position = () => documentScroll.evaluate(el => ({ top: el.scrollTop, left: el.scrollLeft }));
   const reference = page.getByRole('button', { name: 'Preview figure 1', exact: true }).first();
   await reference.hover();
-  await expect(page.getByRole('dialog', { name: 'Reference preview' })).toBeVisible();
+  await expect(preview.locator('[data-preview-mode="crop"]')).toBeVisible();
+  const figureCrop = JSON.parse(await preview.locator('.cropped-reference').getAttribute('data-crop'));
+  expect(figureCrop.top).toBeGreaterThan(100); expect(figureCrop.top).toBeLessThan(142);
+  expect(figureCrop.top + figureCrop.height).toBeGreaterThan(415);
+  expect(figureCrop.top + figureCrop.height).toBeLessThan(460);
+  expect(figureCrop.width).toBeGreaterThan(470); expect(figureCrop.width).toBeLessThan(550);
   await reference.click();
   await expect(page.getByRole('button', { name: 'Pin preview' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Show full page', exact: true }).click();
+  await expect(preview.locator('[data-preview-mode="page"]')).toBeVisible();
+  await page.getByRole('button', { name: 'Show cropped reference', exact: true }).click();
+  await expect(preview.locator('[data-preview-mode="crop"] canvas')).toBeVisible();
   await page.screenshot({ path: join(results, 'reader-reference.png') });
-  await page.getByRole('button', { name: 'Go to page' }).click();
+  const originalPosition = await position();
+  await page.getByRole('button', { name: 'Go to page', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Page number', exact: true })).toHaveValue('2');
+  const samePageLink = documentScroll.locator('[data-page="2"]').getByRole('button', { name: 'Preview table 1', exact: true });
+  await samePageLink.hover(); await expect(preview.locator('[data-preview-mode="crop"]')).toBeVisible();
+  await samePageLink.click(); const samePageOrigin = await position();
+  await page.getByRole('button', { name: 'Go to page', exact: true }).click();
+  await expect.poll(async () => Math.abs((await position()).top - samePageOrigin.top)).toBeGreaterThan(5);
+  const citationLink = documentScroll.getByRole('button', { name: 'Preview cite 1', exact: true });
+  await citationLink.hover();
+  await expect(preview).toContainText('page 3');
+  await expect(preview.locator('[data-preview-mode="page"]')).toBeVisible();
+  await citationLink.click(); const nestedPosition = await position();
+  await page.getByRole('button', { name: 'Go to page', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Page number', exact: true })).toHaveValue('3');
+  const tableLink = documentScroll.getByRole('button', { name: /^Preview table 1$/i }).last();
+  await tableLink.hover();
+  await expect(preview.locator('[data-preview-mode="crop"]')).toBeVisible();
+  const tableCrop = JSON.parse(await preview.locator('.cropped-reference').getAttribute('data-crop'));
+  expect(tableCrop.top).toBeGreaterThan(440); expect(tableCrop.top).toBeLessThan(480);
+  expect(tableCrop.top + tableCrop.height).toBeGreaterThan(565);
+  expect(tableCrop.top + tableCrop.height).toBeLessThan(600);
+  await tableLink.click(); const thirdPosition = await position();
+  await page.screenshot({ path: join(results, 'reader-table-reference.png') });
+  await page.getByRole('button', { name: 'Go to page', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Page number', exact: true })).toHaveValue('2');
+  for (const [expectedPage, expectedPosition] of [[3, thirdPosition], [2, nestedPosition], [2, samePageOrigin], [1, originalPosition]]) {
+    await page.getByRole('button', { name: `Back to page ${expectedPage}`, exact: true }).click();
+    await expect(page.getByRole('textbox', { name: 'Page number', exact: true })).toHaveValue(String(expectedPage));
+    await expect.poll(async () => Math.abs((await position()).top - expectedPosition.top)).toBeLessThan(2);
+    await expect.poll(async () => Math.abs((await position()).left - expectedPosition.left)).toBeLessThan(2);
+  }
+  await page.keyboard.press('Alt+ArrowRight');
+  await expect(page.getByRole('textbox', { name: 'Page number', exact: true })).toHaveValue('2');
+  await expect.poll(async () => Math.abs((await position()).top - samePageOrigin.top)).toBeLessThan(2);
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect(page.getByRole('textbox', { name: 'Page number', exact: true })).toHaveValue('1');
   // Select an unlinked reference using the actual PDF.js text layer.
   await page.getByRole('textbox', { name: 'Page number', exact: true }).fill('1');
   await page.getByRole('textbox', { name: 'Page number', exact: true }).press('Enter');
@@ -168,7 +215,7 @@ try {
   const index = JSON.parse(await readFile(join(data, 'library/library.json'), 'utf8'));
   expect(index.entries[0].bibtex).toContain('research2026');
   expect(errors).toEqual([]);
-  console.log('PASS: merged title bar, native theme synchronization/restart, narrow-window actions, focus title bar, PDF rendering/search/previews, library and BibTeX persistence, navigation.');
+  console.log('PASS: cropped figure/table previews, explicit PDF destinations, same-page and four-level nested jumps with exact Back/Forward restoration, merged title bar, native theme synchronization/restart, narrow-window actions, focus title bar, PDF rendering/search/previews, library and BibTeX persistence, navigation.');
   console.log(`Screenshots and demo PDF: ${results}`);
 } catch (e) {
   if (app) { const windows = app.windows(); if (windows[0]) await windows[0].screenshot({ path: join(results, 'failure.png') }).catch(() => {}); }

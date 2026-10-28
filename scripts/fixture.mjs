@@ -25,8 +25,10 @@ export async function makeFixture(file) {
   line(1, 'With context          97.2%                12 seconds', 256);
   line(1, 'Without context       82.4%                31 seconds', 230);
   line(1, 'Attention to detail matters.', 180);
+  line(1, 'See [1] for details.', 150);
   line(2, 'References', 720, 22, bold);
   line(2, '[1] Researcher, J. (2026). Reading with context. Journal of Ideas.', 660, 11);
+  line(2, 'Table 1', 620, 11);
   line(2, 'Appendix: Pattern matching', 590, 15, bold);
   line(2, 'Measurements: 12, 24, 48. Email: reader@example.org', 555);
   // A short adversarial string is enough to exercise catastrophic backtracking.
@@ -42,6 +44,12 @@ export async function makeFixture(file) {
     annotations.push(pdf.context.register(pdf.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: [x, 580, x + width, 595], Border: [0, 0, 0], Dest: PDFString.of(name) })));
   }
   pages[0].node.set(PDFName.of('Annots'), pdf.context.obj(annotations));
+  // Cross-references on destination pages exercise nested jumps and returns.
+  for (const [number, dest, y, width] of [[1, 'cite.1', 148, 100], [2, 'table.1', 618, 190]]) {
+    const links = [pdf.context.register(pdf.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: [55, y, 55 + width, y + 16], Border: [0, 0, 0], Dest: number === 2 ? pdf.context.obj([pages[1].ref, PDFName.of('XYZ'), 55, 315, null]) : PDFString.of(dest) }))];
+    if (number === 1) links.push(pdf.context.register(pdf.context.obj({ Type: 'Annot', Subtype: 'Link', Rect: [55, 178, 200, 194], Border: [0, 0, 0], Dest: PDFString.of('table.1') })));
+    pages[number].node.set(PDFName.of('Annots'), pdf.context.obj(links));
+  }
   const outlineRoot = pdf.context.obj({ Type: 'Outlines', Count: 1 });
   const rootRef = pdf.context.register(outlineRoot);
   const outline = pdf.context.register(pdf.context.obj({ Title: PDFString.of('Results'), Parent: rootRef, Dest: PDFString.of('figure.1') }));

@@ -32,7 +32,7 @@ Electron downloads its native runtime on first use. The initial run needs networ
 
 - Native file picker, PDF drag and drop, and opening a PDF passed on the command line or through OS file associations.
 - Continuous, high-DPI viewing with selectable/copyable text, page navigation, zoom, fit width/page, rotation, focus mode, document outline, and thumbnails. Pages outside the visible area release their render surfaces.
-- Floating previews of internal PDF links, including linked figures, tables, and bibliography entries. Hover to peek, click to keep a preview open, and jump to its destination with a return-to-page button.
+- Floating previews of internal PDF links: cropped figures and tables with captions, and page previews for sections and bibliography entries. Hover to peek, click to pin, and follow nested references with Back/Forward position history.
 - For PDFs without links, select a reference such as `Figure 2`, `Table 1`, or `[12]` and choose **Preview reference**. Caption/bibliography lookup is heuristic; linked destinations are more reliable, especially in multi-column papers.
 - Full-document literal, case-sensitive/insensitive, and regular-expression search, with snippets and on-page highlights. Regex runs in an isolated worker and is terminated after 1.8 seconds. Searches return up to 5,000 matches. Regex uses JavaScript syntax with Unicode/global flags and optional case insensitivity. Zero-width matches are omitted.
 - A local library containing independent PDF copies, metadata, reading position, and BibTeX. Identical files are deduplicated by SHA-256. Save a PDF with the **Save** button; opening alone does not add it to the library.
@@ -58,6 +58,7 @@ Scholar lookup opens in the system browser. aPDF does **not** automatically scra
 | Fit width | Cmd/Ctrl + 0 |
 | Previous / next page | Left / Right or Page Up / Page Down |
 | First / last page | Home / End |
+| Back / forward through reference history | Alt + Left / Right |
 | Next / previous search result | Enter / Shift + Enter in search |
 | Toggle focus mode | F |
 | Close preview / exit focus | Esc |
@@ -134,6 +135,12 @@ The native test uses an isolated temporary application-data directory, creates i
 AI summaries and semantic search are intentionally deferred. A future provider can consume the page-indexed text from `buildIndex` without changing the PDF renderer. Add background chunking and an embedding index keyed by PDF hash; return page/offset references for semantic hits so results navigate and highlight like current search. Summaries should cite pages, cache by document hash/model, and make any transfer of document text an explicit user choice. Provider credentials belong in the OS credential store rather than the renderer or library index.
 
 Current limits: 300 MB per PDF; no OCR for image-only scans, annotation editing, form filling, PDF modification, cloud sync, or AI requests. Search and heuristic reference previews require an extractable text layer. Only one document is active at a time.
+
+## Cross-reference previews
+
+Hover over a linked figure or table to see a crop of its content and caption. Click to pin the popup. **Show full page** provides surrounding context, and **Go to page** jumps to the original document. Sections and citations keep their page previews. Cropping uses caption text and page geometry; scanned PDFs and uncertain layouts fall back to a labelled page preview.
+
+Follow further references from each destination to build a nested history. **Back to page** and **Forward to page** restore the saved position within each page, including jumps within the same page. **Alt+Left** and **Alt+Right** provide the same controls. Following a new reference after going back starts a new branch of history.
 
 ## Updates
 

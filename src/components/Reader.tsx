@@ -4,9 +4,12 @@ import { PdfPage } from './PdfPage';
 import { ReferencePreview } from './ReferencePreview';
 import { buildIndex, resolveDestination } from '../pdf';
 import { resolveReference } from '../core/search.mjs';
+import { pushReference, traverseReferences } from '../core/reference-history.mjs';
 import { useSearch } from '../useSearch';
 import type { DocumentState, IndexedPage, OutlineItem, ReferenceTarget } from '../types';
 
+interface ViewLocation { page: number; x: number; y: number }
+interface ReferenceHistory { back: ViewLocation[]; forward: ViewLocation[] }
 type Pane = 'search' | 'outline' | 'pages' | null;
 export function Reader({ doc, dark, onToggleTheme, onCheckUpdates, onBack, onSave, onCitation, onError, onPosition }: {
   dark: boolean; onToggleTheme: () => void; onCheckUpdates: () => void;
@@ -29,7 +32,10 @@ export function Reader({ doc, dark, onToggleTheme, onCheckUpdates, onBack, onSav
   const [selected, setSelected] = useState(0);
   const [preview, setPreview] = useState<{ target: ReferenceTarget; pinned: boolean } | null>(null);
   const [selection, setSelection] = useState<{ label: string; page: number; x: number; y: number } | null>(null);
-  const [history, setHistory] = useState<number[]>([]);
+  const [history, setHistory] = useState<ReferenceHistory>({ back: [], forward: [] });
+  const historyRef = useRef(history);
+  const navigationQueue = useRef(Promise.resolve());
+  const navigationSequence = useRef(0);
   const [saving, setSaving] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const scroll = useRef<HTMLDivElement>(null);
@@ -48,21 +54,59 @@ export function Reader({ doc, dark, onToggleTheme, onCheckUpdates, onBack, onSav
     return result;
   }, [search.matches]);
 
-  const navigate = useCallback((number: number, target?: ReferenceTarget) => {
+  const navigate = useCallback(async (number: number, target?: ReferenceTarget, exact = false) => {
+    const request = ++navigationSequence.current;
     const n = Math.max(1, Math.min(doc.pdf.numPages, number));
     const container = scroll.current;
     const element = container?.querySelector<HTMLElement>(`[data-page="${n}"]`);
     if (!container || !element) return;
-    container.scrollTop = element.offsetTop - 28;
-    setPage(n); setPageInput(String(n));
+    let x: number | undefined, y: number | undefined;
     if (target?.y !== undefined) {
-      void doc.pdf.getPage(n).then(pdfPage => {
+      try {
+        const pdfPage = await doc.pdf.getPage(n);
+        if (request !== navigationSequence.current) return;
         const viewport = pdfPage.getViewport({ scale, rotation: (pdfPage.rotate + rotation) % 360 });
-        const [, y] = viewport.convertToViewportPoint(target.x || 0, target.y!);
-        container.scrollTop = element.offsetTop + Math.max(0, y - 120);
-      }).catch(error => onErrorRef.current(error.message));
+        [x, y] = viewport.convertToViewportPoint(target.x ?? 0, target.y);
+      } catch (error) { onErrorRef.current((error as Error).message); return; }
     }
+    if (request !== navigationSequence.current || !container.isConnected) return;
+    container.scrollTop = element.offsetTop + (y === undefined ? -28 : exact ? y : Math.max(0, y - 120));
+    if (exact && x !== undefined) container.scrollLeft = element.offsetLeft + x;
+    pageRef.current = n; setPage(n); setPageInput(String(n));
   }, [doc.pdf, scale, rotation]);
+  const captureLocation = useCallback(async (): Promise<ViewLocation | null> => {
+    const container = scroll.current, n = pageRef.current;
+    const element = container?.querySelector<HTMLElement>(`[data-page="${n}"]`);
+    if (!container || !element) return null;
+    const request = navigationSequence.current;
+    const left = container.scrollLeft - element.offsetLeft, top = container.scrollTop - element.offsetTop;
+    const pdfPage = await doc.pdf.getPage(n);
+    const viewport = pdfPage.getViewport({ scale, rotation: (pdfPage.rotate + rotation) % 360 });
+    if (request !== navigationSequence.current || !container.isConnected) return null;
+    const [x, y] = viewport.convertToPdfPoint(left, top);
+    return { page: n, x, y };
+  }, [doc.pdf, scale, rotation]);
+  const queueNavigation = useCallback((action: () => Promise<void>) => {
+    const next = navigationQueue.current.catch(() => {}).then(action);
+    navigationQueue.current = next;
+    return next;
+  }, []);
+  const jumpTo = useCallback((target: ReferenceTarget) => queueNavigation(async () => {
+    const location = await captureLocation();
+    if (!location) return;
+    const next = pushReference(historyRef.current, location);
+    historyRef.current = next; setHistory(next);
+    await navigate(target.page, target);
+  }), [captureLocation, navigate, queueNavigation]);
+  const travel = useCallback((direction: 'back' | 'forward') => queueNavigation(async () => {
+    const location = await captureLocation();
+    if (!location) return;
+    const result = traverseReferences(historyRef.current, location, direction);
+    if (!result) return;
+    historyRef.current = result.history; setHistory(result.history);
+    linkSequence.current++; clearTimeout(hoverTimer.current); clearTimeout(hideTimer.current); setPreview(null);
+    await navigate(result.target.page, { ...result.target, label: 'Reading position' }, true);
+  }), [captureLocation, navigate, queueNavigation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,11 +148,12 @@ export function Reader({ doc, dark, onToggleTheme, onCheckUpdates, onBack, onSav
       const modifier = event.metaKey || event.ctrlKey;
       const editing = /INPUT|TEXTAREA/.test((event.target as HTMLElement).tagName);
       if (modifier && event.key.toLowerCase() === 'f') { event.preventDefault(); setPane('search'); setTimeout(() => queryInput.current?.focus(), 0); }
-      else if (event.key === 'Escape') { setPreview(null); setSelection(null); setFocusMode(false); if (pane === 'search') setPane(null); }
+      else if (event.key === 'Escape') { linkSequence.current++; clearTimeout(hoverTimer.current); setPreview(null); setSelection(null); setFocusMode(false); if (pane === 'search') setPane(null); }
       else if (modifier && ['+', '=', '-'].includes(event.key)) { event.preventDefault(); changeZoom(event.key === '-' ? -0.1 : 0.1); }
       else if (modifier && event.key === '0') { event.preventDefault(); setFit('width'); }
       else if (modifier && event.key.toLowerCase() === 's') { event.preventDefault(); void onSave().catch(e => onErrorRef.current(e.message)); }
       else if (modifier && event.key.toLowerCase() === 'p') { event.preventDefault(); void window.apdf.print(doc.file.token).catch(e => onErrorRef.current(e.message)); }
+      else if (!editing && event.altKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) { event.preventDefault(); void travel(event.key === 'ArrowLeft' ? 'back' : 'forward').catch(e => onErrorRef.current(e.message)); }
       else if (!editing && ['ArrowRight', 'PageDown'].includes(event.key)) { event.preventDefault(); navigate(pageRef.current + 1); }
       else if (!editing && ['ArrowLeft', 'PageUp'].includes(event.key)) { event.preventDefault(); navigate(pageRef.current - 1); }
       else if (!editing && event.key === 'Home') { event.preventDefault(); navigate(1); }
@@ -117,7 +162,7 @@ export function Reader({ doc, dark, onToggleTheme, onCheckUpdates, onBack, onSav
     }
     window.addEventListener('keydown', keyboard);
     return () => window.removeEventListener('keydown', keyboard);
-  }, [doc, navigate, changeZoom, pane, onSave]);
+  }, [doc, navigate, changeZoom, pane, onSave, travel]);
 
   const cancelHide = () => clearTimeout(hideTimer.current);
   const closePreview = () => { linkSequence.current++; clearTimeout(hoverTimer.current); setPreview(null); };
@@ -203,7 +248,7 @@ export function Reader({ doc, dark, onToggleTheme, onCheckUpdates, onBack, onSav
           <div className="search-results">{search.matches.map((match, i) => <button key={`${match.page}-${match.start}`} className={`search-result ${i === selected ? 'active' : ''}`} onClick={() => setSelected(i)}><span>PAGE {match.page}</span><p>…{match.snippet.slice(0, match.snippetStart)}<mark>{match.snippet.slice(match.snippetStart, match.snippetStart + match.end - match.start)}</mark>{match.snippet.slice(match.snippetStart + match.end - match.start)}…</p></button>)}
             {!query && <div className="pane-empty"><Search size={26} /><p>A closer look.</p><span>Search the full document. Use regular expressions for more precise results.</span></div>}
             {query && !search.busy && !search.error && pages.length > 0 && !search.matches.length && <div className="pane-empty"><p>No matches found.</p><span>Try a different phrase or turn off match case.</span></div>}</div></>}
-        {pane === 'outline' && <div className="outline-pane"><h3>Contents</h3>{outline.length ? <Outline items={outline} onClick={destination => { if (destination) run(async () => { const target = await resolveDestination(doc.pdf, destination); if (target) { setHistory(h => [...h, page]); navigate(target.page, target); } }); }} /> : <div className="pane-empty"><List size={26} /><p>No outline in this PDF.</p><span>Use page thumbnails or search to find your way.</span></div>}</div>}
+        {pane === 'outline' && <div className="outline-pane"><h3>Contents</h3>{outline.length ? <Outline items={outline} onClick={destination => { if (destination) run(async () => { const target = await resolveDestination(doc.pdf, destination); if (target) await jumpTo(target); }); }} /> : <div className="pane-empty"><List size={26} /><p>No outline in this PDF.</p><span>Use page thumbnails or search to find your way.</span></div>}</div>}
         {pane === 'pages' && <div className="thumbnails">{Array.from({ length: doc.pdf.numPages }, (_, i) => <button className={`thumbnail ${page === i + 1 ? 'active' : ''}`} key={i} aria-label={`Go to page ${i + 1}`} onClick={() => navigate(i + 1)}><PdfPage pdf={doc.pdf} number={i + 1} scale={148 / defaultSize.width} text={false} defaultSize={defaultSize} /><span>{i + 1}</span></button>)}</div>}
       </aside>}
       <main ref={scroll} className="document-scroll" aria-label="PDF document" onMouseUp={selectionChanged} onScroll={() => {
@@ -221,9 +266,12 @@ export function Reader({ doc, dark, onToggleTheme, onCheckUpdates, onBack, onSav
       }}><div className="page-stack">{Array.from({ length: doc.pdf.numPages }, (_, i) => <PdfPage key={i} pdf={doc.pdf} number={i + 1} scale={scale} rotation={rotation} defaultSize={defaultSize} indexed={pages[i]} matches={matchesByPage.get(i + 1)} activeMatch={activeMatch} onLink={showLink} onLinkLeave={hidePreview} onExternal={url => run(() => window.apdf.external(url))} />)}</div></main>
     </div>
     <footer className="reader-status"><span><span className="status-dot" />{progress < doc.pdf.numPages ? `Indexing text · ${progress}/${doc.pdf.numPages}` : 'All pages ready'}</span><span>Hover over a linked reference to preview it <span className="status-separator">·</span> Select an unlinked reference for a preview</span><span>{Math.round(scale * 100)}% <span className="status-separator">·</span> {page} / {doc.pdf.numPages}</span></footer>
-    {!!history.length && <button className="return-button secondary-button" onClick={() => { navigate(history[history.length - 1]); setHistory(h => h.slice(0, -1)); }}><ArrowLeft size={14} /> Back to page {history[history.length - 1]}</button>}
+    {(history.back.length > 0 || history.forward.length > 0) && <nav className="reference-history" aria-label="Reference navigation">
+      {!!history.back.length && <button className="secondary-button" title="Return to previous reading position (Alt+Left)" onClick={() => run(() => travel('back'))}><ArrowLeft size={14} /> Back to page {history.back.at(-1)!.page}</button>}
+      {!!history.forward.length && <button className="secondary-button" title="Go forward in reference history (Alt+Right)" onClick={() => run(() => travel('forward'))}>Forward to page {history.forward.at(-1)!.page} <ArrowRight size={14} /></button>}
+    </nav>}
     {selection && <button className="selection-preview primary-button" style={{ left: selection.x, top: selection.y }} onMouseDown={e => e.preventDefault()} onClick={previewSelection}><Highlighter size={14} /> Preview reference</button>}
-    {preview && <ReferencePreview pdf={doc.pdf} target={preview.target} pinned={preview.pinned} onClose={closePreview} onPin={() => setPreview(value => value && { ...value, pinned: !value.pinned })} onEnter={cancelHide} onLeave={hidePreview} onJump={() => { setHistory(h => [...h, page]); navigate(preview.target.page, preview.target); closePreview(); }} />}
+    {preview && <ReferencePreview key={`${preview.target.page}-${preview.target.x}-${preview.target.y}-${preview.target.label}`} pdf={doc.pdf} target={preview.target} pinned={preview.pinned} onClose={closePreview} onPin={() => setPreview(value => value && { ...value, pinned: !value.pinned })} onEnter={cancelHide} onLeave={hidePreview} onJump={() => { const target = preview.target; closePreview(); run(() => jumpTo(target)); }} />}
   </div>;
 }
 function Outline({ items, onClick }: { items: OutlineItem[]; onClick: (dest: OutlineItem['dest']) => void }) {

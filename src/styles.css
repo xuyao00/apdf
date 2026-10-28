@@ -196,7 +196,6 @@ mark { background: #dfca6b66; color: inherit; padding: 1px 0; }
 .exit-focus { flex: none; margin-left: auto; opacity: .7; }
 .exit-focus:hover, .exit-focus:focus-visible { opacity: 1; }
 .exit-focus span { font-size: 10px; color: var(--muted); }
-.return-button { position: absolute; z-index: 10; left: 20px; bottom: 47px; font-size: 10px; box-shadow: 0 2px 10px #0001; }
 .selection-preview { position: fixed; z-index: 20; padding: 8px 10px; box-shadow: var(--shadow); font-size: 11px; }
 .reference-preview { position: fixed; z-index: 30; bottom: 46px; right: 24px; width: 472px; max-width: calc(100vw - 48px); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); background: var(--bg); overflow: hidden; }
 .reference-preview header { display: flex; align-items: center; gap: 4px; padding: 13px 12px 13px 16px; }
@@ -256,3 +255,12 @@ mark { background: #dfca6b66; color: inherit; padding: 1px 0; }
 .update-status p { margin: 0 0 10px; }
 .update-status progress { width: 100%; accent-color: var(--accent); }
 .update-status button { margin-top: 4px; font-size: 11px; }
+
+.preview-loading { min-height: 200px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 12px; color: #555; }
+.cropped-reference { width: 100%; background: white; color: #333; }
+.cropped-reference canvas { display: block; }
+.cropped-reference p { padding: 12px; font-size: 12px; }
+.reference-history { position: absolute; z-index: 10; left: 20px; bottom: 47px; display: flex; gap: 8px; }
+.reference-history button { font-size: 10px; box-shadow: 0 2px 10px #0001; }
+
+.preview-body[data-preview-mode='crop'] { height: auto; max-height: min(55vh, 500px); }

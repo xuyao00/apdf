@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { TextLayer, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist';
 import type { IndexedPage, SearchMatch } from '../types';
+import { referenceLabel } from '../core/reference-regions.mjs';
 
 interface Props {
   pdf: PDFDocumentProxy; number: number; scale: number; rotation?: number;
@@ -62,9 +63,10 @@ function PageContent({ pdf, number, scale, rotation = 0, text = true, indexed, m
       render = page.render({ canvas: target, viewport, transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0] });
       await render.promise;
       if (cancelled) return;
-      if (text) {
+      const content = text || onLink ? await page.getTextContent() : undefined;
+      if (text && content) {
         textTarget.replaceChildren();
-        textLayer = new TextLayer({ textContentSource: await page.getTextContent(), container: textTarget, viewport });
+        textLayer = new TextLayer({ textContentSource: content, container: textTarget, viewport });
         layer.current = textLayer;
         await textLayer.render();
       }
@@ -73,8 +75,18 @@ function PageContent({ pdf, number, scale, rotation = 0, text = true, indexed, m
       if (cancelled) return;
       setLinks(annotations.filter(a => a.subtype === 'Link' && (a.dest || a.url)).map(a => {
         const rect = [...viewport.convertToViewportPoint(a.rect[0], a.rect[1]), ...viewport.convertToViewportPoint(a.rect[2], a.rect[3])];
-        const destLabel = typeof a.dest === 'string' ? a.dest.replace(/[._:]/g, ' ') : 'Reference';
-        return { id: a.id, rect: [Math.min(rect[0], rect[2]), Math.min(rect[1], rect[3]), Math.abs(rect[2] - rect[0]), Math.abs(rect[3] - rect[1])], dest: a.dest, url: a.url, label: destLabel };
+        const destLabel = typeof a.dest === 'string' ? a.dest : '';
+        const visible = (content?.items || []).filter(item => {
+          if (!('str' in item)) return false;
+          const x = item.transform[4], y = item.transform[5];
+          return x + item.width > a.rect[0] && x < a.rect[2] && y + item.height > a.rect[1] && y < a.rect[3];
+        }).map(item => {
+          if (!('str' in item) || !item.width) return '';
+          const start = Math.max(0, Math.floor((a.rect[0] - item.transform[4]) / item.width * item.str.length));
+          const end = Math.min(item.str.length, Math.ceil((a.rect[2] - item.transform[4]) / item.width * item.str.length));
+          return item.str.slice(start, end);
+        }).join(' ');
+        return { id: a.id, rect: [Math.min(rect[0], rect[2]), Math.min(rect[1], rect[3]), Math.abs(rect[2] - rect[0]), Math.abs(rect[3] - rect[1])], dest: a.dest, url: a.url, label: referenceLabel(destLabel, visible) };
       }));
       setRenderVersion(v => v + 1);
       onReadyRef.current?.(viewport.width, viewport.height);
