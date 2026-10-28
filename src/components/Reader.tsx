@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Bookmark, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Expand, FileText, Highlighter, List, LoaderCircle, Maximize, Minus, Moon, MoreHorizontal, PanelLeft, Plus, Printer, RotateCw, Search, Sun, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RefreshCw, Bookmark, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Expand, FileText, Highlighter, List, LoaderCircle, Maximize, Minus, Moon, MoreHorizontal, PanelLeft, Plus, Printer, RotateCw, Search, Sun, X } from 'lucide-react';
 import { PdfPage } from './PdfPage';
 import { ReferencePreview } from './ReferencePreview';
 import { buildIndex, resolveDestination } from '../pdf';
@@ -8,8 +8,8 @@ import { useSearch } from '../useSearch';
 import type { DocumentState, IndexedPage, OutlineItem, ReferenceTarget } from '../types';
 
 type Pane = 'search' | 'outline' | 'pages' | null;
-export function Reader({ doc, dark, onToggleTheme, onBack, onSave, onCitation, onError, onPosition }: {
-  dark: boolean; onToggleTheme: () => void;
+export function Reader({ doc, dark, onToggleTheme, onCheckUpdates, onBack, onSave, onCitation, onError, onPosition }: {
+  dark: boolean; onToggleTheme: () => void; onCheckUpdates: () => void;
   doc: DocumentState; onBack: () => void; onSave: () => Promise<void>; onCitation: () => void;
   onError: (message: string) => void; onPosition: (page: number) => void;
 }) {
@@ -176,9 +176,10 @@ export function Reader({ doc, dark, onToggleTheme, onBack, onSave, onCitation, o
       <button className="icon-button secondary-tool" aria-label="Print PDF" title="Open print viewer" onClick={() => run(() => window.apdf.print(doc.file.token))}><Printer size={17} /></button>
       <button className="icon-button optional-tool" aria-label="Focus mode" title="Focus mode (F; Esc to exit)" onClick={() => setFocusMode(true)}><Maximize size={17} /></button>
       <button className="icon-button" aria-label={dark ? 'Use light theme' : 'Use dark theme'} title="Switch theme" onClick={onToggleTheme}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button>
-      <details className="toolbar-more" onKeyDown={e => { if (e.key === 'Escape') { e.currentTarget.open = false; e.stopPropagation(); } }}>
+      <details className="toolbar-more update-menu" onKeyDown={e => { if (e.key === 'Escape') { e.currentTarget.open = false; e.stopPropagation(); } }}>
         <summary className="icon-button" role="button" aria-label="More reader actions" title="More reader actions"><MoreHorizontal size={18} /></summary>
         <div className="toolbar-menu" onClick={e => { e.currentTarget.closest('details')!.open = false; }}>
+          <button onClick={onCheckUpdates}><RefreshCw size={16} /> Check for updates</button>
           <button className="compact-menu-item" onClick={() => setFit('page')}><Expand size={16} /> Fit page</button>
           <button className="compact-menu-item" onClick={onCitation}><span className="cite-icon">{'{ }'}</span> Citation details</button>
           <button className="compact-menu-item" onClick={() => setRotation(r => (r + 90) % 360)}><RotateCw size={16} /> Rotate clockwise</button>

@@ -135,6 +135,10 @@ AI summaries and semantic search are intentionally deferred. A future provider c
 
 Current limits: 300 MB per PDF; no OCR for image-only scans, annotation editing, form filling, PDF modification, cloud sync, or AI requests. Search and heuristic reference previews require an extractable text layer. Only one document is active at a time.
 
+## Updates
+
+Choose **Check for updates** in the library sidebar, the reader’s **More reader actions** menu, or the native **Help** menu. aPDF checks the latest stable GitHub release and opens its download page when a newer version is available. Checks run only when requested; updates are installed manually. No published release, connection errors, and GitHub rate limits are reported explicitly.
+
 ## License
 
 aPDF is licensed under [GNU LGPL version 3.0](LICENSE) (LGPL-3.0-only). See [COPYING](COPYING) for the incorporated GPL terms and [NOTICE](NOTICE) for attribution. Third-party components retain their own licenses.

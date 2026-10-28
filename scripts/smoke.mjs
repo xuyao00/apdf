@@ -30,6 +30,31 @@ async function launch() {
 try {
   let launched = await launch(); app = launched.instance; let page = launched.page;
   await expect(page.getByRole('heading', { name: 'Your library', exact: true })).toBeVisible();
+  // Exercise the actual preload/IPC action without blocking on native dialogs.
+  await app.evaluate(({ dialog, shell }) => {
+    globalThis.apdfUpdateTest = { fetch: globalThis.fetch, dialog: dialog.showMessageBox, external: shell.openExternal, messages: [], opened: [], reply: 0 };
+    dialog.showMessageBox = async (...args) => { globalThis.apdfUpdateTest.messages.push(args.at(-1)); return { response: globalThis.apdfUpdateTest.reply }; };
+    shell.openExternal = async url => { globalThis.apdfUpdateTest.opened.push(url); };
+  });
+  try {
+    for (const [status, body, message] of [
+      [200, { tag_name: 'v0.1.0' }, 'aPDF is up to date'],
+      [404, {}, 'No release is available yet'],
+      [200, { tag_name: 'v99.0.0' }, 'aPDF 99.0.0 is available'],
+      [429, {}, 'Could not check for updates']
+    ]) {
+      await app.evaluate((_electron, { status, body }) => { globalThis.fetch = async () => new Response(JSON.stringify(body), { status }); }, { status, body });
+      await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+      await expect.poll(() => app.evaluate(() => globalThis.apdfUpdateTest.messages.at(-1)?.message)).toBe(message);
+    }
+    expect(await app.evaluate(() => globalThis.apdfUpdateTest.opened)).toEqual(['https://github.com/xuyao00/apdf/releases/tag/v99.0.0']);
+  } finally {
+    await app.evaluate(({ dialog, shell }) => {
+      const original = globalThis.apdfUpdateTest;
+      globalThis.fetch = original.fetch; dialog.showMessageBox = original.dialog; shell.openExternal = original.external;
+      delete globalThis.apdfUpdateTest;
+    });
+  }
   await page.screenshot({ path: join(results, 'library-empty.png') });
   await page.getByRole('button', { name: 'Use dark theme', exact: true }).click();
   await expect.poll(() => app.evaluate(({ nativeTheme }) => nativeTheme.shouldUseDarkColors)).toBe(true);

@@ -7,6 +7,7 @@ export interface LibraryEntry {
 export interface OpenedFile { token: string; filename: string; bytes: Uint8Array; entry?: LibraryEntry }
 export interface DesktopAPI {
   platform: string;
+  checkForUpdates(): Promise<void>;
   setTheme(theme: 'light' | 'dark'): Promise<void>;
   open(): Promise<OpenedFile | null>;
   openDropped(file: File): Promise<OpenedFile>;

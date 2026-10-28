@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDownAZ, ArrowRight, BookOpen, Check, Clock3, FilePlus2, FileText, FolderOpen, HardDrive, Library, LoaderCircle, LockKeyhole, Moon, MoreHorizontal, Plus, Search, ShieldCheck, Sparkles, Sun, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDownAZ, ArrowRight, RefreshCw, BookOpen, Check, Clock3, FilePlus2, FileText, FolderOpen, HardDrive, Library, LoaderCircle, LockKeyhole, Moon, MoreHorizontal, Plus, Search, ShieldCheck, Sparkles, Sun, Trash2, Upload, X } from 'lucide-react';
 import { Reader } from './components/Reader';
 import { BibtexDialog } from './components/BibtexDialog';
 import { loadPdf } from './pdf';
@@ -119,12 +119,12 @@ export default function App() {
     const file = event.dataTransfer.files[0];
     if (file) run(async () => openFile(await window.apdf.openDropped(file)));
   }}>
-    {!window.apdf ? <div className="browser-notice">Run aPDF as a desktop app with <code>npm run dev</code>.</div> : doc ? <Reader key={doc.file.token} doc={doc} dark={dark} onToggleTheme={() => setDark(v => !v)} onBack={closeReader} onSave={() => save()} onCitation={() => setCitation(true)} onError={notify} onPosition={persistPosition} /> : <>
+    {!window.apdf ? <div className="browser-notice">Run aPDF as a desktop app with <code>npm run dev</code>.</div> : doc ? <Reader key={doc.file.token} doc={doc} dark={dark} onToggleTheme={() => setDark(v => !v)} onCheckUpdates={() => run(() => window.apdf.checkForUpdates())} onBack={closeReader} onSave={() => save()} onCitation={() => setCitation(true)} onError={notify} onPosition={persistPosition} /> : <>
       <aside className="library-sidebar"><div className="brand"><img className="brand-icon" src={appIcon} alt="" /><span>aPDF</span></div>
         <button className="primary-button open-button" onClick={() => void open()}><Plus size={17} /> Open PDF <kbd>{window.apdf?.platform === 'darwin' ? '⌘' : 'Ctrl'} O</kbd></button>
         <div className="sidebar-label">WORKSPACE</div>
         <nav><button className={section === 'all' ? 'active' : ''} onClick={() => setSection('all')}><Library size={18} /> All documents <span>{entries.length}</span></button><button className={section === 'recent' ? 'active' : ''} onClick={() => setSection('recent')}><Clock3 size={18} /> Recently opened</button></nav>
-        <div className="sidebar-bottom"><div className="future-note"><Sparkles size={17} /><div><strong>A little more insight.</strong><p>AI summaries and semantic search are on the roadmap.</p><span>COMING LATER</span></div></div>
+        <div className="sidebar-bottom"><button className="text-button update-check" onClick={() => run(() => window.apdf.checkForUpdates())}><RefreshCw size={14} /> Check for updates</button><div className="future-note"><Sparkles size={17} /><div><strong>A little more insight.</strong><p>AI summaries and semantic search are on the roadmap.</p><span>COMING LATER</span></div></div>
           <div className="storage-note"><HardDrive size={16} /><div><span>Stored on this device</span><small>{entries.length} PDF{entries.length !== 1 ? 's' : ''} · {formatSize(totalSize)}</small></div><button className="icon-button" aria-label={dark ? 'Use light theme' : 'Use dark theme'} title="Switch theme" onClick={() => setDark(v => !v)}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button></div></div>
       </aside>
       <div className="library-main"><header className="library-topbar"><div><span>Workspace</span><ChevronRightSmall /><strong>{section === 'all' ? 'All documents' : 'Recently opened'}</strong></div><span className="local-badge"><span className="status-dot" /> Local library</span></header>

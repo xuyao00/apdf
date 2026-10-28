@@ -4,6 +4,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { randomUUID } = require('node:crypto');
 const { Library, validatePdf, MAX_PDF_BYTES } = require('./library.cjs');
+const { getUpdateStatus } = require('./updates.cjs');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'apdf', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 let window, library, pendingFile;
@@ -49,6 +50,29 @@ async function external(url) {
   const parsed = new URL(url);
   if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('Only HTTP and HTTPS links can be opened.');
   await shell.openExternal(parsed.href);
+}
+let updateCheck;
+function checkForUpdates() {
+  if (updateCheck) return updateCheck;
+  updateCheck = (async () => {
+    const owner = window;
+    const show = options => owner && !owner.isDestroyed() ? dialog.showMessageBox(owner, options) : dialog.showMessageBox(options);
+    try {
+      const result = await getUpdateStatus(app.getVersion());
+      const available = result.status === 'available';
+      const { response } = await show({
+        type: 'info', title: 'aPDF updates',
+        message: available ? `aPDF ${result.latestVersion} is available` : result.status === 'no-release' ? 'No release is available yet' : 'aPDF is up to date',
+        detail: `Installed version: ${result.currentVersion}.` + (available ? '\nDownload the installer for your operating system from GitHub Releases.' : result.status === 'no-release' ? '\nCheck again after a release has been published on GitHub.' : '\nYou have the latest available version or a newer development build.'),
+        buttons: available ? ['View release', 'Later'] : ['OK'], defaultId: 0, cancelId: available ? 1 : 0,
+        noLink: true
+      });
+      if (available && response === 0) await external(result.releaseUrl);
+    } catch (error) {
+      await show({ type: 'error', title: 'aPDF updates', message: 'Could not check for updates', detail: error.message, buttons: ['OK'] });
+    }
+  })().finally(() => { updateCheck = undefined; });
+  return updateCheck;
 }
 function createWindow() {
   window = new BrowserWindow({
@@ -132,6 +156,7 @@ if (gotLock) app.whenReady().then(async () => {
     return fs.readFile(result.filePaths[0], 'utf8');
   });
   handle('app:external', external);
+  handle('app:check-updates', checkForUpdates);
   handle('app:theme', requested => {
     if (requested !== 'light' && requested !== 'dark') throw new Error('Invalid theme.');
     theme = requested;
@@ -165,7 +190,8 @@ if (gotLock) app.whenReady().then(async () => {
     { label: 'File', submenu: [{ label: 'Open PDF…', accelerator: 'CmdOrCtrl+O', click: () => window?.webContents.send('pdf:available', 'dialog') }, { role: 'close' }] },
     { role: 'editMenu' },
     { label: 'View', submenu: [{ role: 'togglefullscreen' }, ...(devUrl ? [{ role: 'toggleDevTools' }] : [])] },
-    { role: 'windowMenu' }
+    { role: 'windowMenu' },
+    { role: 'help', submenu: [{ label: 'Check for Updates…', click: () => { void checkForUpdates(); } }] }
   ]));
   pendingFile ||= process.argv.slice(1).find(arg => arg.toLowerCase().endsWith('.pdf'));
   initialized = true;
