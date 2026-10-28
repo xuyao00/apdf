@@ -2,6 +2,8 @@
 
 A minimal desktop PDF reader for Linux, Windows, and macOS. Built with Electron, React, TypeScript, and PDF.js. Documents are rendered locally; no account, backend, or API key is needed.
 
+This project is fully vibe coded.
+
 The name is **aPDF**, as in “a PDF file.” Its icon is a greyscale paper book on a graphite tile.
 
 ## Download
