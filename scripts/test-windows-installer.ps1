@@ -3,6 +3,7 @@ param(
   [Parameter(Mandatory=$true)][string]$Candidate,
   [Parameter(Mandatory=$true)][string]$ArmInstaller,
   [Parameter(Mandatory=$true)][string]$CandidateVersion,
+  [string]$BaselineVersion = '0.1.0',
   [switch]$DiagnosePublished
 )
 $ErrorActionPreference = 'Stop'
@@ -37,7 +38,7 @@ function Assert-Installed([string]$Version) {
 }
 
 if ((Run-Installer $Baseline) -ne 0) { throw 'Baseline installation failed.' }
-Assert-Installed '0.1.0'
+Assert-Installed $BaselineVersion
 if ($DiagnosePublished) {
   if ((Run-Installer $Candidate) -ne 0) { throw 'Published x64 upgrade failed.' }
   Assert-Installed $CandidateVersion
@@ -48,7 +49,7 @@ if ($DiagnosePublished) {
   $originalHash = (Get-FileHash $appExe -Algorithm SHA256).Hash
   $wrongExit = Run-Installer $ArmInstaller 30
   if ($wrongExit -ne 1633) { throw "Wrong-architecture installer should exit with 1633, got $wrongExit" }
-  Assert-Installed '0.1.0'
+  Assert-Installed $BaselineVersion
   if ((Get-FileHash $appExe -Algorithm SHA256).Hash -ne $originalHash) { throw 'Wrong-architecture installer changed the installed app.' }
   if ((Run-Installer $Candidate) -ne 0) { throw 'Candidate x64 upgrade failed.' }
   Assert-Installed $CandidateVersion

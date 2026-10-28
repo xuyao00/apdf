@@ -81,7 +81,7 @@ To create the macOS installer on a Mac, including a universal app for Apple Sili
 npm run dist:mac
 ```
 
-Open `release/aPDF-0.2.0-macOS-universal.dmg`, then drag **aPDF** into **Applications**. The same directory also contains a ZIP of the universal app. These local builds have no Developer ID signature or Apple notarization; distribution to other users requires signing/notarization credentials.
+Open `release/aPDF-0.2.1-macOS-universal.dmg`, then drag **aPDF** into **Applications**. The same directory also contains a ZIP of the universal app. These local builds have no Developer ID signature or Apple notarization; distribution to other users requires signing/notarization credentials.
 
 The icon source, PNG, and ICNS are in `build/`. `npm run icons:mac` regenerates the native icon sizes using macOS tools. See [icon design and generation prompt](build/icon-design.md).
 
@@ -99,9 +99,11 @@ npm run dist:linux    # Debian installers and portable tar.gz archives
 npm run dist:desktop  # both platforms from a supported build host
 ```
 
+**Windows architecture:** use **x64** for Intel/AMD PCs (most Windows computers). Use **ARM64** only for Windows on ARM devices, such as Snapdragon-based PCs. The ARM64 installer rejects incompatible PCs before modifying an existing installation.
+
 Windows installers support installation for the current user and let you choose the installation folder. The portable EXEs run without installation. The installers are unsigned.
 
-On Debian or Ubuntu, install the package for your architecture with `sudo apt install ./aPDF-0.2.0-Linux-amd64.deb` (or the `arm64` package). This installs the application, icon, desktop entry, and PDF file association. Removing the package preserves your personal library. The Debian packager uses the existing project author label; it adds no maintainer email or project website. The portable Linux archives contain the `apdf` executable and its resources.
+On Debian or Ubuntu, install the package for your architecture with `sudo apt install ./aPDF-0.2.1-Linux-amd64.deb` (or the `arm64` package). This installs the application, icon, desktop entry, and PDF file association. Removing the package preserves your personal library. The Debian packager uses the existing project author label; it adds no maintainer email or project website. The portable Linux archives contain the `apdf` executable and its resources.
 
 Outputs in `release/`:
 

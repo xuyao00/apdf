@@ -1,6 +1,17 @@
 name: Windows installer upgrade
 on:
+  push:
+    paths:
+      - package.json
+      - build/installer.nsh
+      - scripts/test-windows-installer.ps1
+      - .github/workflows/windows-installer.yml
   workflow_dispatch:
+    inputs:
+      diagnose_published:
+        description: Reproduce the unsupported-architecture behavior in old published installers
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -25,6 +36,7 @@ jobs:
           gh release download v0.1.0 --pattern '*Windows-x64-Setup.exe' --dir installer-test
           gh release download v0.2.0 --pattern '*Windows-*-Setup.exe' --dir installer-test
       - name: Diagnose published installers
+        if: inputs.diagnose_published == true
         shell: pwsh
         run: |
           ./scripts/test-windows-installer.ps1 -Baseline installer-test/aPDF-0.1.0-Windows-x64-Setup.exe -Candidate installer-test/aPDF-0.2.0-Windows-x64-Setup.exe -ArmInstaller installer-test/aPDF-0.2.0-Windows-arm64-Setup.exe -CandidateVersion 0.2.0 -DiagnosePublished
@@ -36,6 +48,11 @@ jobs:
         run: |
           $version = (Get-Content package.json | ConvertFrom-Json).version
           ./scripts/test-windows-installer.ps1 -Baseline installer-test/aPDF-0.1.0-Windows-x64-Setup.exe -Candidate "release/aPDF-$version-Windows-x64-Setup.exe" -ArmInstaller "release/aPDF-$version-Windows-arm64-Setup.exe" -CandidateVersion $version
+      - name: Test upgrade from 0.2.0
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          ./scripts/test-windows-installer.ps1 -Baseline installer-test/aPDF-0.2.0-Windows-x64-Setup.exe -BaselineVersion 0.2.0 -Candidate "release/aPDF-$version-Windows-x64-Setup.exe" -ArmInstaller "release/aPDF-$version-Windows-arm64-Setup.exe" -CandidateVersion $version
       - name: Launch and test installed application
         run: npm run test:e2e
       - uses: actions/upload-artifact@v4
