@@ -31,7 +31,7 @@ function Assert-Installed([string]$Version) {
     if (-not (Test-Path $file)) { throw "Installed application is missing: $file" }
   }
   $actual = [Diagnostics.FileVersionInfo]::GetVersionInfo($appExe).ProductVersion
-  if ($actual -ne $Version) { throw "Expected installed version $Version, got $actual" }
+  if ($actual -ne $Version -and $actual -ne "$Version.0") { throw "Expected installed version $Version, got $actual" }
   if ((Get-Content $sentinel -Raw).Trim() -ne 'Preserve saved library data') { throw 'Upgrade changed user library data.' }
   Write-Host "Verified installed aPDF $actual and preserved user data."
 }
